@@ -9,6 +9,12 @@ GetSampleInterval::usage="GetSampleInterval";
 Ps::usage="Ps";
 
 
+Pr::usage="Pr";
+
+
+Pc::usage="Pc";
+
+
 Pos::usage="Return open sample cad projection of A.";
 
 
@@ -18,13 +24,13 @@ Pmc::usage="Return McCallum projection of A.";
 polytosmt2::usage="polytosmt2";
 
 
-(* Satsolver::usage="Sat Solver."; *)
-
-
-(*checkpoly::usage="checkpoly.";*)
+ClauseResolve::usage="ClauseResolve";
 
 
 CheckConflictHalf::usage="half conflict set check.";
+
+
+Leadcoeff::usage="Leadcoeff";
 
 
 FindMid::usage="findmid.";
@@ -78,7 +84,18 @@ Module[{p1={},p2={},c,i,j},
 Pr[A_List,x_]:=Map[Apply[Resultant[#1,#2,x]&],Subsets[A,{2}]];
 
 
-Pr[A_List,B_,x_]:=Map[Apply[Resultant[#1,#2,x]&],Select[Tuples[{A,B}],UnsameQ[#[[1]],#[[2]]]&]];
+Pr[A_List,B_List,x_]:=Map[Apply[Resultant[#1,#2,x]&],Select[Tuples[{A,B}],UnsameQ[#[[1]],#[[2]]]&]];
+
+
+Pmc[A_List,M_Association,x_]:=
+Module[{A1,B,M1=KeyDrop[M,x],p1},
+    A1=DeleteDuplicates[Flatten[Map[FactorList,A][[All,All,1]]]];
+    B=Select[A1,Not[MemberQ[Variables[#],x]]&];
+    A1=Select[A1,MemberQ[Variables[#],x]&];
+    p1=Pc[A1,M1,x][[1]];
+    A1=Select[A1,MemberQ[Variables[#/.M1],x]&];
+    Return[DeleteDuplicates[Flatten[{B,p1,Discriminant[A1,x],Pr[A1,x]}]]];
+];
 
 
 Pmc[A_List,x_]:=
@@ -94,7 +111,7 @@ GetSampleInterval[A_List,M_Association,x_]:=
 Module[{A1=DeleteDuplicates[Flatten[Map[FactorList,A][[All,All,1]]]],B,A0,A2,x0=M[x],
         M1=KeyDrop[M,x],rootintervals,numroot,tmpindex,
         rightindex,rightrootindex,leftindex,leftrootindex},
-    B=Select[A1,Not[MemberQ[Variables[#],x]]&];
+    B=Select[A1,(Not[MemberQ[Variables[#],x]] && UnsameQ[Variables[#],{}])&];
     A1=Select[A1,MemberQ[Variables[#],x]&];
     A0=Select[A1,MemberQ[Variables[#/.M1],x]&];
     If[Length[A0]==0,Return[{{},{B,A1,A0,{{},{}}}}]];
@@ -212,79 +229,7 @@ Module[{i,A1,B,M1,p1,p2,p3,A0,A2,x0,rootintervals,numroot,tmpindex,tmprootindex,
 ];
 
 
-(* SearchClause[Clause_, LearnC_, M_Association] := 
-  Module[{c1, c2, lc1, a}, 
-   c1 = Map[Map[Sign[#]*Lookup[M, Abs[#], 0] &, #] &, Clause];
-   c2 = Map[Max, c1];
-   If[Min[c2] == 1, Return["SAT"]];
-   a = FirstPosition[c2, -1, {0}, 1][[1]];
-   If[a != 0, Return[{-1, a}]];
-   cl1 = Map[Map[Sign[#]*Lookup[M, Abs[#], 0] &, #] &, LearnC];
-   c2 = Map[Max, c1];
-   a = FirstPosition[c2, -1, {0}, 1][[1]];
-   If[a != 0, Return[{-1, -a}]];
-   c2 = Map[Count[#, 0]*2 + Max[#] &, c1];
-   a = FirstPosition[c2, 2, {0}, 1][[1]];
-   If[a != 0, Return[{1, a}]];
-   cl1 = Map[Count[#, 0]*2 + Max[#] &, cl1];
-   a = FirstPosition[cl1, 2, {0}, 1][[1]];
-   If[a != 0, Return[{1, -a}]];
-   Return[{0, 
-     FirstPosition[Map[(# > 0 && BitAnd[#, 1] == 0) &, c2], True, {0},
-        1][[1]]}];
-]; *)
-
-
-
 ClauseResolve[Clause_,E_,F_]:=Union[Clause,E]/.{F->Nothing,(-F)->Nothing};
-
-
-(* Satsolver[Clause_] := 
-Module[{LearnC = {}, M = <||>, ML = {}, order = <||>, a, cc, ca, o, 
-    s}, 
-    While[True, a = SearchClause[Clause, LearnC, M];
-        (* Print[Clause, LearnC, M, ML, order, a];
-        Input[]; *)
-        If[SameQ[a, "SAT"], Return[{"SAT", M}]];
-        If[a[[1]] == -1, 
-            If[a[[2]] > 0, cc = Clause[[a[[2]]]], cc = LearnC[[-a[[2]]]]];
-            If[Length[cc] == 0, Return[{"UNSAT"}]];
-            For[a = Select[cc, Length[ML[[order[Abs[#]]]]] == 3 &],Length[a] != 0, a = Select[cc, Length[ML[[order[Abs[#]]]]] == 3 &],
-                (* Print[a];
-                Input[]; *)
-                cc = Fold[ClauseResolve[#1, ML[[order[Abs[#2]]]][[3]], #2] &, cc, a];
-                (* Print[cc];
-                Input[]; *)
-            ];
-            If[Length[cc] == 0, Return[{"UNSAT"}]];
-            (* Print[cc]; *)
-            AppendTo[LearnC, cc];
-            ca = Map[Abs, cc];
-            a = MaximalBy[ca, order][[1]];
-            o = order[a];
-            s = ML[[o]][[2]];
-            M = Fold[KeyDrop[#1, #2[[1]]] &, M, ML[[o ;; -1]]];
-            ML = ML[[1 ;; o]];
-            ML[[o]] = {a, -s, cc};
-            M[a] = -s;
-            ,
-            If[a[[1]] == 1, 
-                If[a[[2]] > 0, cc = Clause[[a[[2]]]], cc = LearnC[[-a[[2]]]]];
-                a = FirstPosition[Map[Lookup[M, Abs[#], 0] &, cc], 0, {0}, 
-                1][[1]];
-                M[Abs[cc[[a]]]] = Sign[cc[[a]]];
-                AppendTo[ML, {Abs[cc[[a]]], Sign[cc[[a]]], cc}];
-                order[Abs[cc[[a]]]] = Length[ML];
-                , 
-                If[a[[2]] > 0, cc = Clause[[a[[2]]]], cc = LearnC[[-a[[2]]]]];
-                a = FirstPosition[Map[Lookup[M, Abs[#], 0] &, cc], 0, {0},1][[1]];
-                M[Abs[cc[[a]]]] = Sign[cc[[a]]];
-                AppendTo[ML, {Abs[cc[[a]]], Sign[cc[[a]]]}];
-                order[Abs[cc[[a]]]] = Length[ML];
-            ];
-        ];
-    ];
-]; *)
 
 
 Leadcoeff[F_,x_]:=Last[CoefficientList[F,x]];
@@ -415,16 +360,31 @@ Module[{isclose,status=False,index,newlist},
 ];
 
 
+FindMid[x_,y_]:=Module[{x1=1,y1=0},
+    NestWhile[(x1=IsolatingInterval[x,#][[2]];y1=IsolatingInterval[y,#][[1]];#/10)&,1,x1>=y1&]; 
+    (* x1=IsolatingInterval[x,(y-x)/2][[2]];y1=IsolatingInterval[y,(y-x)/2][[1]]; *)
+    Return[(y1+x1)/2];
+]
+
+
 FindMid[conflictstatelist_List]:=Module[{len=0,mid=Infinity,x},
     len=Length[conflictstatelist];
-    If[len==0,Return[2]];
+    If[len==0,Return[1]];
     If[conflictstatelist[[1,1]]!=-Infinity,
-        Return[FindInstance[x < conflictstatelist[[1,1]] , {x}, Rationals][[1,1,2]]]];
+        (* Return[FindInstance[x < conflictstatelist[[1,1]] , {x}, Rationals][[1,1,2]]] *)
+        x=IsolatingInterval[conflictstatelist[[1,1]]];
+        Return[If[x[[1]]<x[[2]],x[[1]],x[[1]]-1/10]];
+    ];
     If[conflictstatelist[[-1,2]]!=Infinity,
-        Return[FindInstance[x > conflictstatelist[[-1,2]] , {x}, Rationals][[1,1,2]]]];
+        (* Return[FindInstance[x > conflictstatelist[[-1,2]] , {x}, Rationals][[1,1,2]]] *)
+       x=IsolatingInterval[conflictstatelist[[-1,2]]];
+        Return[If[x[[1]]>x[[2]],x[[2]],x[[2]]+1/10]];
+    ];
     Scan[If[conflictstatelist[[#-1,2]]<conflictstatelist[[#,1]],
-            mid=FindInstance[x> conflictstatelist[[#-1,2]] && x < conflictstatelist[[#,1]] , 
-                 {x}, Rationals][[1,1,2]];Return[],
+            mid=FindMid[conflictstatelist[[#-1,2]],conflictstatelist[[#,1]]];
+            (* mid=FindInstance[x> conflictstatelist[[#-1,2]] && x < conflictstatelist[[#,1]] , 
+                 {x}, Rationals][[1,1,2]]; *)
+            Return[],
             If[mid==Infinity && conflictstatelist[[#-1,2]]==conflictstatelist[[#,1]] && 
                 !conflictstatelist[[#-1,3]] && !conflictstatelist[[#,3]],
                 mid=conflictstatelist[[#-1,2]]]]&,
@@ -433,90 +393,19 @@ FindMid[conflictstatelist_List]:=Module[{len=0,mid=Infinity,x},
 ]
 
 
-(* checkpoly[Feasiblelist_List,f1_,x_,l_]:=Module[{rootnum,a,b,cf,status,rootindex,Feasiblelist1={},listindex,a1,b1,listlength},
-    cf={l};status=l>0;
-    If[SameQ[f1,0],Return[{True,Feasiblelist}]];
-    rootnum=CountRoots[f1,x];
-    If[rootnum==0,
-        If[Not[Xor[Leadcoeff[f1,x]>0,status]],Return[{True,Feasiblelist}],Return[{False,cf}]]
-    ];
-    If[Not[Xor[Leadcoeff[f1,x]>0 && Mod[rootnum,2]==0 || Leadcoeff[f1,x]<0 && Mod[rootnum,2]==1 ,status]],
-        a={-Infinity};b={Root[f1,1],l};
-        rootindex=1;
-        ,
-        a={Root[f1,1],l};
-        rootindex=2;
-        If[rootindex>rootnum,b={Infinity},b={Root[f1,rootindex],l}];
-    ];
-    listindex=1;listlength=Length[Feasiblelist];
-    While[True,
-        If[a[[1]]!=b[[1]],
-            While[listindex<=listlength && a[[1]]>=Feasiblelist[[listindex,2,1]] ,
-                ++listindex;
-            ];
-            While[listindex<=listlength &&Feasiblelist[[listindex,1,1]]<b[[1]],
-                If[Feasiblelist[[listindex,1,1]]>a[[1]],a1=Feasiblelist[[listindex,1]],a1=a];
-                If[Feasiblelist[[listindex,2,1]]>b[[1]],
-                    b1=b;
-                    AppendTo[Feasiblelist1,{a1,b1}];    
-                    Break[];
-                ];
-                b1=Feasiblelist[[listindex,2]];
-                AppendTo[Feasiblelist1,{a1,b1}];    
-                a=b1;
-                While[listindex<=listlength && a[[1]]>=Feasiblelist[[listindex,2,1]] ,
-                    ++listindex;
-                ];
-            
-            ];
-            If[Length[Feasiblelist1]==0,
-                If[listindex>listlength,AppendTo[cf,Feasiblelist[[listlength,2,2]]],
-                    If[listindex==1,AppendTo[cf,Feasiblelist[[1,1,2]]],AppendTo[cf,Feasiblelist[[listindex-1,2,2]]];AppendTo[cf,Feasiblelist[[listindex,1,2]]]]
-                ];
-            ];
-            If[listindex>listlength,Break[]];
-            
-        ];
-        If[rootindex>=rootnum ,Break[]];
-        a={Root[f1,++rootindex],l};
-        If[++rootindex>rootnum,b={Infinity},b={Root[f1,rootindex],l}];
-        
-    ];
-    If[Length[Feasiblelist1]==0,
-        Return[{False,cf}],
-        Return[{True,Feasiblelist1}]];
-];
-
-
-checkpoly[Feasiblelist_List,r1_,l_List]:=Module[{status,Feasiblelist1,r},
-    r={r1,l[[1]]};status=(Not[Xor[l[[1]]>0,l[[2]]]]);
-    If[status,
-        If[Feasiblelist[[-1,2,1]]<=r[[1]],Return[{False,{Feasiblelist[[-1,2,2]],l[[1]]}}]];
-        Feasiblelist1=Feasiblelist[[LengthWhile[Feasiblelist,#[[2,1]]<=r[[1]]&]+1;;-1]];
-        If[Feasiblelist1[[1,1,1]]<r[[1]],Feasiblelist1[[1,1]]=r];
-        Return[{True,Feasiblelist1}];
-    ,
-        If[Feasiblelist[[1,1,1]]>=r[[1]],Return[{False,{Feasiblelist[[1,1,2]],l[[1]]}}]];
-        Feasiblelist1=Feasiblelist[[1;;LengthWhile[Feasiblelist,#[[1,1]]<r[[1]]&]]];
-        If[Feasiblelist1[[-1,2,1]]>r[[1]],Feasiblelist1[[-1,2]]=r];
-        Return[{True,Feasiblelist1}];     
-    ];
-]; *)
-
-
 NRASolver[Clause1_,F1_,X_]:=Module[{a,cc,i,j,xmap=<||>,fmap=<||>,F=F1,Flevel,Fnow,conflictstatelist,Ci,Cli,Clause=Clause1,Clearn={},
                                     varnum,Clausenum,assignment=Association[Map[#->0&,X]],lorder,z,lnum,ML,M,Morder,VC,
                                     Cstatus,Clstatus,levell,levelc,levelcl,level,tmplevel,tmpc,tmpcl,status,nowc,conflict,
                                     getFnow,getFlevel,getClause,checkconflict,Polynomialroot,getorder,addl,getF,
-                                    samplecell,getsamplecell},
+                                    samplecell,getsamplecell,nextsamplecell},
     lnum=Length[F];
     (*Symmetry Check*)
     Module[{x0=X[[1]],C={}},
     Scan[
         If[(F1/.{#->x0,x0->#})==F1,AppendTo[F,{1,#-x0}];++lnum;AppendTo[C,{-lnum}];x0=#]&
-    ,X[[2;;]]];Clause={Sequence@@C,Sequence@@Clause};
+    ,X[[2;;]]];
     (*Print[F];Print[Clause]*)
-    If[Length[C]!=0,Print["Find Symmetry: ",Map[Sequence@@F[[Abs[#],2]]&,C]]]
+    If[Length[C]>Length[X]/2,Print["Find Symmetry: ",Map[Sequence@@F[[Abs[#],2]]&,C]];Clause={Sequence@@C,Sequence@@Clause}]
     ];
     (**)
     varnum=Length[X];
@@ -565,23 +454,27 @@ NRASolver[Clause1_,F1_,X_]:=Module[{a,cc,i,j,xmap=<||>,fmap=<||>,F=F1,Flevel,Fno
                 newl=getF[{5,l,a}];
                 ,newl=Nothing];
             newl]];
-    samplecell=Function[i,If[F[[i,1]]==5 && SameQ[F[[i,4]],False],
-        Module[{newlist=If[Length[F[[i,2]]]==1,
-                            Pmc[F[[i,2,1]],X[[lorder[[i]]+1]]],
-                            Ps[F[[i,2]],F[[i,3]],X[[lorder[[i]]+1]]]],
-                x0=X[[lorder[[i]]]],
-                pc,nextl,fg,fl},
-                pc=GetSampleInterval[newlist,F[[i,3]],x0];
-                nextl=getsamplecell[pc[[2]],F[[i,3]][[;;-2]]];
-                F[[i,4]]={nextl};
-                Scan[(
+    nextsamplecell=Function[{lst,a,x0},
+        Module[{pc=GetSampleInterval[lst,a,x0],nextl,fg,fl},
+            nextl={getsamplecell[pc[[2]],a[[;;-2]]]};
+            Scan[(
                     fg=getF[{3,#[[2]]/.(x0->z),#[[3]],x0}];
                     fl=getF[{4,#[[2]]/.(x0->z),#[[3]],x0}];
                     Switch[#[[1]],
-                        Greater,AppendTo[F[[i,4]],-fg],
-                        Equal,AppendTo[F[[i,4]],fg];AppendTo[F[[i,4]],fl],
-                        Less,AppendTo[F[[i,4]],-fl]]
-                )&,pc[[1]]]]]];
+                        Greater,AppendTo[nextl,-fg],
+                        Equal,AppendTo[nextl,fg];AppendTo[nextl,fl],
+                        Less,AppendTo[nextl,-fl]]
+                )&,pc[[1]]]; 
+            nextl
+        ]
+    ];
+    samplecell=Function[i,If[F[[i,1]]==5 && SameQ[F[[i,4]],False],
+        Module[{newlist=If[Length[F[[i,2]]]==1,
+                            Pmc[F[[i,2,1]],assignment,X[[lorder[[i]]+1]]],
+                            Ps[F[[i,2]],F[[i,3]],X[[lorder[[i]]+1]]]],
+                x0=X[[lorder[[i]]]]},
+                F[[i,4]]=nextsamplecell[newlist,F[[i,3]],x0];
+        ]]];
 
     getFnow=(Switch[F[[#,1]],
         1,(F[[#,2]]/.assignment)>0,
@@ -693,8 +586,22 @@ NRASolver[Clause1_,F1_,X_]:=Module[{a,cc,i,j,xmap=<||>,fmap=<||>,F=F1,Flevel,Fno
                     
                     If[tmplevel==level,
                         a=Select[conflict,(lorder[[Abs[#]]]==level && F[[Abs[#],1]]==5)&];
-
                         If[Length[a]!=0,
+                            (* Scan[samplecell[#]&,a];
+                            If[Length[a]==1 || level==1,
+                                conflict=DeleteDuplicates[
+                                Fold[(If[#2<0,Print["error:",  #, " in conflict ."]];
+                                #1/.(#2->Sequence@@F[[#2,4]]))&
+                                ,conflict,a]]; 
+                            ,
+                                Module[{c=<||>},
+                                    conflict=Select[conflict,(lorder[[Abs[#]]]!=level || F[[Abs[#],1]]!=5)&];
+                                    Scan[If[SameQ[Head[c[F[[#,3]]]],Missing],c[F[[#,3]]]={#},AppendTo[c[F[[#,3]]],#]]&,a];
+                                    c=List@@c;
+                                    c=Map[nextsamplecell[DeleteDuplicates[Flatten[Map[(F[[F[[#,4,1]],2]])&,#]]],F[[#[[1]],3]],X[[level]]]&,c];
+                                    conflict=DeleteDuplicates[Flatten[{conflict,c}]];
+                                ];
+                            ]; *)
                             conflict=DeleteDuplicates[
                                 Fold[(If[#2<0,Print["error:",  #, " in conflict ."]];
                                 samplecell[#2];#1/.(#2->Sequence@@F[[#2,4]]))&
@@ -745,53 +652,15 @@ NRASolver[Clause1_,F1_,X_]:=Module[{a,cc,i,j,xmap=<||>,fmap=<||>,F=F1,Flevel,Fno
             ,
                 cc=DeleteDuplicates[Map[#[[4]]&,tmpc[[2]]]];
                 If[level>1,
-                    (* tmpc=Table[{},level-1];
-                    tmpcl=Pmc[
-                                (* Map[
-                                    Function[x,
-                                        If[Length[F[[Abs[x]]]]==1,
-                                            F[[Abs[x],1]],
-                                            F[[Abs[x],1]]/.#->F[[Abs[x],3]]]],cc] *)
-                                Map[Function[x,
-                                    If[F[[Abs[x],1]]==1 || F[[Abs[x],1]]==2,
-                                        F[[Abs[x],2]],
-                                        F[[Abs[x],2]]/.(z->X[[level]])]]
-                                ,cc]
-                            ,X[[level]]];
-                    Scan[
-                        (tmpcl=Pos[tmpcl,assignment,X[[#]],"Poly"];
-                        tmpc[[#]]=tmpcl[[2]];
-                        tmpcl=tmpcl[[1]])&
-                    ,Range[level-1,1,-1]];
-                    conflict=Table[Map[(* status=Switch[#[[1]],Greater,-1,Equal,0,Less,1]; *)
-                                    (* If[status>=0, *)
-                                Module[{lg={3,#[[2]]/.(X[[i]]->z),#[[3]],X[[i]]},ll={4,#[[2]]/.(X[[i]]->z),#[[3]],X[[i]]},
-                                        fg,fl},
-                                    (* fg=fmap[lg];
-                                    If[SameQ[Head[fg],Missing],
-                                        AppendTo[F,lg];++lnum;fmap[lg]=lnum;
-                                        AppendTo[lorder,i];fg=lnum;
-                                        AppendTo[levell[[i]],lnum];AppendTo[Flevel,Root[lg[[2]]/.assignment,#[[3]]]];
-                                        AppendTo[Fnow,assignment[X[[i]]]>Flevel[[-1]]];
-                                        AppendTo[M,0];AppendTo[Morder,0];AppendTo[VC[[1]],{}];AppendTo[VC[[-1]],{}];
-                                        ];
-                                    fl=fmap[ll];
-                                    If[SameQ[Head[fl],Missing],
-                                        AppendTo[F,ll];++lnum;fmap[ll]=lnum;
-                                        AppendTo[lorder,i];fl=lnum;
-                                        AppendTo[levell[[i]],lnum];AppendTo[Flevel,Root[ll[[2]]/.assignment,#[[3]]]];
-                                        AppendTo[Fnow,assignment[X[[i]]]<Flevel[[-1]]];
-                                        AppendTo[M,0];AppendTo[Morder,0];AppendTo[VC[[1]],{}];AppendTo[VC[[-1]],{}];
-                                        ]; *)
-                                    (* ]; *)
-                                    fg=getF[lg];fl=getF[ll];
-                                    Switch[#[[1]],Less,fg,Greater,fl,Equal,{fg,fl}]
-                                ]&,tmpc[[i]]],{i,1,level-1}];*)
-                    conflict=getsamplecell[{Map[Function[x,
-                            If[F[[Abs[x],1]]==1 || F[[Abs[x],1]]==2,
-                                F[[Abs[x],2]],
-                                F[[Abs[x],2]]/.(z->X[[level]])]]
-                        ,cc]},assignment[[;;level-1]]];
+                    Module[{l},
+                        l=Map[Function[x,
+                                If[F[[Abs[x],1]]==1 || F[[Abs[x],1]]==2,
+                                    F[[Abs[x],2]],
+                                    F[[Abs[x],2]]/.(z->X[[level]])]]
+                            ,cc];
+                        l=Select[DeleteDuplicates[Flatten[Map[FactorList,l][[All,All,1]]]],UnsameQ[Variables[#],{}]&];
+                        conflict=getsamplecell[{l},assignment[[;;level-1]]];
+                    ]
                     ,
                     conflict=Nothing;
                 ];
