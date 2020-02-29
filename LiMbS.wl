@@ -150,7 +150,7 @@ Module[{A1=DeleteDuplicates[Flatten[Map[FactorList,A][[All,All,1]]]],B,A0,A2,x0=
 
 Ps[l_List,M_Association,x_]:=Module[{p1,p2,p3,M1=KeyDrop[M,x]},
     p1=Pc[l[[2]],M1,x];
-    If[Length[p1[[2]]]!=0,Print[p1[[2]],M,x]];
+    (*If[Length[p1[[2]]]!=0,Print[p1[[2]],M,x]];*)
     p2=Discriminant[l[[3]],x];
     p3=Pr[l[[4,1]],l[[4,2]],x];
     Return[DeleteDuplicates[{Sequence@@l[[1]],Sequence@@p1[[1]],Sequence@@p2,Sequence@@p3}]];
@@ -393,11 +393,12 @@ FindMid[conflictstatelist_List]:=Module[{len=0,mid=Infinity,x},
 ]
 
 
-NRASolver[Clause1_,F1_,X_]:=Module[{a,cc,i,j,xmap=<||>,fmap=<||>,F=F1,Flevel,Fnow,conflictstatelist,Ci,Cli,Clause=Clause1,Clearn={},
+NRASolver[Clause1_,F1_,X_]:=Module[{a,cc,i,j,xmap=<||>,fmap=<||>,F=Map[{1,#}&,F1],Flevel,Fnow,conflictstatelist,Ci,Cli,Clause=Clause1,Clearn={},
                                     varnum,Clausenum,assignment=Association[Map[#->0&,X]],lorder,z,lnum,ML,M,Morder,VC,
                                     Cstatus,Clstatus,levell,levelc,levelcl,level,tmplevel,tmpc,tmpcl,status,nowc,conflict,
                                     getFnow,getFlevel,getClause,checkconflict,Polynomialroot,getorder,addl,getF,
                                     samplecell,getsamplecell,nextsamplecell},
+    (*Print[F];*)
     lnum=Length[F];
     (*Symmetry Check*)
     Module[{x0=X[[1]],C={}},
