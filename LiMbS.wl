@@ -159,7 +159,7 @@ Ps[l_List,M_Association,x_]:=Module[{p1,p2,p3,M1=KeyDrop[M,x]},
 
 Pos[A_List,M_Association,x_,mod_:"Root"]:=
 Module[{i,A1,B,M1,p1,p2,p3,A0,A2,x0,rootintervals,numroot,tmpindex,tmprootindex,rightindex,rightrootindex,leftindex,leftrootindex},
-    Assert[mod=="Root" || mod=="poly"];
+    Assert[mod=="Root" || mod=="Poly"];
     A1=DeleteDuplicates[Flatten[Map[FactorList,A][[All,All,1]]]];
     B=Select[A1,Not[MemberQ[Variables[#],x]]&];
     A1=Select[A1,MemberQ[Variables[#],x]&];
